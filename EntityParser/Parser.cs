@@ -27,6 +27,10 @@ namespace EntityParser
 
         public bool Process()
         {
+            if (!Directory.Exists(this.outputFolderPath))
+            {
+                Directory.CreateDirectory(this.outputFolderPath);
+            }
             this.FieldsFromDescribeFile = this.GetAllFieldsFromItsDescribeFile();
             var fieldNamesFromSample = this.GetAllFieldNamesFromSample();
             this.FieldsFromSample = new List<Entity>();
