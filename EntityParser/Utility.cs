@@ -57,5 +57,16 @@ namespace EntityParser
                     return "unknown";
             }
         }
+
+        public static string AddNullableMarker(string csharpType, bool isNullable)
+        {
+            // TODO enable string nullable type.
+            if (csharpType == "string")
+            {
+                return csharpType;
+            }
+
+            return isNullable ? $"{csharpType}?" : csharpType;
+        }
     }
 }

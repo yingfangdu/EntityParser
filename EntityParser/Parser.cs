@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
+using System.Collections;
 
 namespace EntityParser
 {
@@ -83,9 +84,10 @@ using Newtonsoft.Json;
 
 namespace Microsoft.Advertising.XandrSFDataService.SFEntity
 {
-        internal class Entity {
-            [JsonProperty(""attributes"", NullValueHandling = NullValueHandling.Ignore)]
-            public Attributes Attributes { get; set; }
+" + 
+        $"    internal class {this.entityName}" + @"{
+        [JsonProperty(""attributes"", NullValueHandling = NullValueHandling.Ignore)]
+        public Attributes Attributes { get; set; }
 ";
             string sfEntityClassEnd = @"
     }
@@ -93,11 +95,11 @@ namespace Microsoft.Advertising.XandrSFDataService.SFEntity
             string fileContent = sfEntityClassStart;
             foreach (var field in this.FieldsFromSample)
             {
-                fileContent = string.Concat(fileContent, $"\n            [JsonProperty(\"{field.Name}\", NullValueHandling = NullValueHandling.Ignore)]\n            public {field.CSharpType} {field.RefineName} {{ get; set; }}\n");
+                fileContent = string.Concat(fileContent, $"\r        [JsonProperty(\"{field.Name}\", NullValueHandling = NullValueHandling.Ignore)]\r        public {field.CSharpType} {field.RefineName} {{ get; set; }}\r");
             }
 
             fileContent = string.Concat(fileContent, sfEntityClassEnd);
-            File.WriteAllText(Path.Combine(this.outputFolderPath, "SFEntity.cs"), fileContent);
+            File.WriteAllText(Path.Combine(this.outputFolderPath, $"SF{this.entityName}.cs"), fileContent);
         }
 
         private void GenerateAdsEntityFile()
@@ -107,8 +109,8 @@ using System;
 
 namespace Microsoft.Advertising.XandrSFDataService.AdsEntity
 {
-        [Serializable]
-        internal class Entity {
+    [Serializable]
+    " + $"internal class {this.entityName}" + @"{
 ";
             string adsEntityClassEnd = @"
     }
@@ -116,18 +118,18 @@ namespace Microsoft.Advertising.XandrSFDataService.AdsEntity
             string fileContent = adsEntityClassStart;
             foreach (var field in this.FieldsFromSample)
             {
-                string nullableMarker = field.IsNullable ? "?" : string.Empty;
-                fileContent = string.Concat(fileContent, $"\n            public {field.CSharpType}{nullableMarker} {field.RefineName} {{ get; set; }}\n");
+                string typeWithNullableMarker = Utility.AddNullableMarker(field.CSharpType, field.IsNullable);
+                fileContent = string.Concat(fileContent, $"\r        public {typeWithNullableMarker} {field.RefineName} {{ get; set; }}\r");
             }
 
             fileContent = string.Concat(fileContent, adsEntityClassEnd);
-            File.WriteAllText(Path.Combine(this.outputFolderPath, "AdsEntity.cs"), fileContent);
+            File.WriteAllText(Path.Combine(this.outputFolderPath, $"Ad{this.entityName}.cs"), fileContent);
         }
 
         private void GenerateQuery()
         {
             string defaultQuery = string.Concat("SELECT+", string.Join(",", this.FieldsFromSample.Select(field => field.Name).ToList()), $"+FROM+{this.entityName}");
-            File.WriteAllText(Path.Combine(this.outputFolderPath, "Query.txt"), defaultQuery);
+            File.WriteAllText(Path.Combine(this.outputFolderPath, $"{this.entityName}Query.txt"), defaultQuery);
         }
     }
 }
