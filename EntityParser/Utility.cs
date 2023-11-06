@@ -74,9 +74,9 @@ namespace EntityParser
             switch (csharpType)
             {
                 case "string":
-                    return "VARCHAR(200)";
+                    return "NVARCHAR(200)";
                 case "DateTime":
-                    return "VARCHAR(200)";
+                    return "NVARCHAR(200)";
                 case "bool":
                     return "BIT";
                 case "int":
@@ -85,6 +85,7 @@ namespace EntityParser
                     return "DECIMAL(18,2)";
                 default:
                     return "unknown";
+
             }
         }
     }

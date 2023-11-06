@@ -159,7 +159,7 @@ namespace Microsoft.Advertising.XandrSFDataService.QueryBuilder
 
         public string BuildTableCreationQuery()
         {
-            return $""CREATE TABLE [{this.TableName}] (";
+            return $""CREATE TABLE [{this.TableName}]"" + @""(";
 
             string columns = "";
             int maxColumnLength = this.FieldsFromSample.Select(field => field.RefineName.Length).Max();
