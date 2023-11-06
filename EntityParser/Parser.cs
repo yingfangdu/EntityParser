@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
-using System.Collections;
 
 namespace EntityParser
 {
@@ -56,7 +55,9 @@ namespace EntityParser
 
             this.GenerateFSEntityFile();
             this.GenerateAdsEntityFile();
-            this.GenerateQuery();
+            this.GenerateQueryBuilder();
+            this.GenerateConverter();
+            this.GenerateDataService();
 
             return true;
         }
@@ -66,7 +67,7 @@ namespace EntityParser
             string content = File.ReadAllText(this.describeFilePath);
             var dynamicObject = JsonConvert.DeserializeObject<JObject>(content);
             JArray fields = dynamicObject.Value<JArray>("fields");
-            return fields.Select(field => 
+            return fields.Select(field =>
                 new Entity((string)(field["name"]), (string)(field["soapType"]), (bool)(field["nillable"]))).ToList();
         }
 
@@ -84,7 +85,7 @@ using Newtonsoft.Json;
 
 namespace Microsoft.Advertising.XandrSFDataService.SFEntity
 {
-" + 
+" +
         $"    internal class {this.entityName}" + @"{
         [JsonProperty(""attributes"", NullValueHandling = NullValueHandling.Ignore)]
         public Attributes Attributes { get; set; }
@@ -126,10 +127,122 @@ namespace Microsoft.Advertising.XandrSFDataService.AdsEntity
             File.WriteAllText(Path.Combine(this.outputFolderPath, $"Ad{this.entityName}.cs"), fileContent);
         }
 
-        private void GenerateQuery()
+        private void GenerateQueryBuilder()
         {
-            string defaultQuery = string.Concat("SELECT+", string.Join(",", this.FieldsFromSample.Select(field => field.Name).ToList()), $"+FROM+{this.entityName}");
-            File.WriteAllText(Path.Combine(this.outputFolderPath, $"{this.entityName}Query.txt"), defaultQuery);
+            string defaultQuery = string.Concat("SELECT +", string.Join(",", this.FieldsFromSample.Select(field => field.Name).ToList()), $"+FROM+{this.entityName}");
+            string builderClassStart = @"
+using Microsoft.Advertising.XandrSFDataService.Interface;
+using System;
+
+namespace Microsoft.Advertising.XandrSFDataService.QueryBuilder
+{
+" + $"internal class {this.entityName}QueryBuilder : SFEntityQueryBuilderBase, ISFEntityQueryBuilder, IAdsEntityQueryBuilder\r" + @"
+{
+" +
+        $"private readonly string EntityNameC = \"{this.entityName}\";\r" +
+        $"private readonly string TableNameC = \"{this.entityName}\";\r" +
+        $"private readonly string DefaultQuery = @\"{defaultQuery}\";\r" +
+
+        @"
+        public string EntityName { get { return this.EntityNameC; } }
+        public string TableName { get { return this.TableNameC; } }
+
+        public string BuildEntityReadQuery(DateTime? lastUpdateTimeStamp)
+        {
+            return string.Concat(GetBaseQueryUrl(), DefaultQuery);
+        }
+
+        public string BuildTableExistQuery()
+        {
+            return $""SELECT COUNT(1) as Count FROM sys.tables  where name = {this.TableName}"";
+        }
+
+        public string BuildTableCreationQuery()
+        {
+            return $""CREATE TABLE [{this.TableName}] (";
+
+            string columns = "";
+            int maxColumnLength = this.FieldsFromSample.Select(field => field.RefineName.Length).Max();
+            int formattedColumnLength = maxColumnLength + 4;
+            foreach (var field in this.FieldsFromSample)
+            {
+               columns = string.Concat(columns, $"\r    {field.RefineName}{new string(' ', formattedColumnLength - field.RefineName.Length)}{Utility.GetSQLType(field.CSharpType)} NULL,");
+            }
+            string builderClassEnd = @"
+);"";
+        }
+    }
+}";
+
+            File.WriteAllText(Path.Combine(this.outputFolderPath, $"{this.entityName}QueryBuilder.cs"), string.Concat(builderClassStart, columns, builderClassEnd));
+        }
+
+        private void GenerateDataService()
+        {
+            string builderClassStart = @"
+using Microsoft.Advertising.XandrSFDataService.AdsEntity;
+using Microsoft.Advertising.XandrSFDataService.Interface;
+using SqlBulkTools;
+using System.Collections.Generic;
+
+namespace Microsoft.Advertising.XandrSFDataService.QueryBuilder
+{
+" + $"internal class {this.entityName}DataService : AdsDataServiceBase<{this.entityName}>" + @"
+{
+" +
+        $"public {this.entityName}DataService(IAdsEntityQueryBuilder queryBuilder) : base(queryBuilder)" + @"
+{
+}
+
+" +
+        $"protected override BulkInsertOrUpdate<{this.entityName}> BuildBulkEditOperation(List<{this.entityName}> items)" +
+        @"
+{
+        return new BulkOperations()
+" + $"                       .Setup<{this.entityName}>()" + @"
+                        .ForCollection(items)
+                        .WithTable(TableName)";
+            string columns = "";
+            foreach (var field in this.FieldsFromSample)
+            {
+                columns = string.Concat(columns, $"\r                        .AddColumn(x => x.{field.RefineName}, \"{field.RefineName}\")");
+            }
+            string builderClassEnd = @"
+                        .BulkInsertOrUpdate()
+                        .SetIdentityColumn(x => x.Id)
+                        .MatchTargetOn(x => x.Id);
+        }
+    }
+}";
+            File.WriteAllText(Path.Combine(this.outputFolderPath, $"{this.entityName}DataService.cs"), string.Concat(builderClassStart, columns, builderClassEnd));
+        }
+
+        private void GenerateConverter()
+        {
+            string adsEntityConverterClassStart = @"
+
+namespace Microsoft.Advertising.XandrSFDataService.Converter
+{
+    " + $"internal static class {this.entityName}Converter" + @"
+    {
+        " + $"public static  AdsEntity.{this.entityName} Converter(SFEntity.{this.entityName} aSFEntity)" + @"
+        {
+" + $"            return new AdsEntity.{this.entityName}()" + @"
+{";
+            string adsEntityConverterClassEnd = @"
+            };
+        }
+    }
+}";
+            string fileContent = adsEntityConverterClassStart;
+            foreach (var field in this.FieldsFromSample)
+            {
+                fileContent = string.Concat(fileContent, $"\r{field.RefineName} = aSFEntity.{field.RefineName},");
+            }
+
+            fileContent = string.Concat(fileContent, adsEntityConverterClassEnd);
+
+            File.WriteAllText(Path.Combine(this.outputFolderPath, $"{this.entityName}Converter.cs"), fileContent);
         }
     }
 }

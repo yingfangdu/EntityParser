@@ -68,5 +68,24 @@ namespace EntityParser
 
             return isNullable ? $"{csharpType}?" : csharpType;
         }
+
+        public static string GetSQLType(string csharpType)
+        {
+            switch (csharpType)
+            {
+                case "string":
+                    return "VARCHAR(200)";
+                case "DateTime":
+                    return "VARCHAR(200)";
+                case "bool":
+                    return "BIT";
+                case "int":
+                    return "INT";
+                case "double":
+                    return "DECIMAL(18,2)";
+                default:
+                    return "unknown";
+            }
+        }
     }
 }
