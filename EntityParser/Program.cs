@@ -5,10 +5,10 @@ namespace EntityParser
     {
         static void Main(string[] args)
         {
-            string describeFilePath = @"C:\Users\yingfand\OneDrive - Microsoft\Temp\UCM\Xandr\Response\case-describe.json";
-            string sampleFilePath = @"C:\Users\yingfand\OneDrive - Microsoft\Temp\UCM\Xandr\Response\case-sample.json";
+            string describeFilePath = @"C:\Users\yingfand\OneDrive - Microsoft\Temp\UCM\Xandr\Response\account-describe.json";
+            string sampleFilePath = @"C:\Users\yingfand\OneDrive - Microsoft\Temp\UCM\Xandr\Response\account-sample.json";
             string outPutFilePath = @"C:\Users\yingfand\Download\Ouput";
-            string entityName = "Case";
+            string entityName = "Account";
             var parser = new Parser(describeFilePath, sampleFilePath, outPutFilePath, entityName);
             parser.Process();
         }

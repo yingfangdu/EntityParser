@@ -14,8 +14,8 @@ namespace EntityParser
         private readonly string outputFolderPath;
         private readonly string entityName;
 
-        public List<SFEntityDescribe> PropertiesFromDescribeFile { get; private set; }
-        public List<MSAEntityDescribe> PropertiesFromSample { get; private set; }
+        public SFEntityDescribe SFDescribes { get; private set; }
+        public AdsEntityDescribe AdsDescribe { get; private set; }
 
         public Parser(string describeFilePath, string sampleEntityPath, string outputFolderPath, string entityName)
         {
@@ -23,6 +23,8 @@ namespace EntityParser
             this.sampleEntityPath = sampleEntityPath;
             this.outputFolderPath = outputFolderPath;
             this.entityName = entityName;
+            this.AdsDescribe = new AdsEntityDescribe();
+            this.SFDescribes = new SFEntityDescribe();
         }
 
         public bool Process()
@@ -33,8 +35,8 @@ namespace EntityParser
             }
 
             // Read the property name from describe file and sample file.
-            this.PropertiesFromDescribeFile = this.GetAllPropertiesFromItsDescribeFile();
-            this.ValidateFields(this.PropertiesFromDescribeFile);
+            this.GetAllPropertiesFromItsDescribeFile();
+            this.ValidateFields(this.SFDescribes.Fields);
             var propertyNamesFromSample = this.GetAllPropertyNamesFromSample();
             var refinedPropertyNamesFromSample = propertyNamesFromSample.Select(name => Utility.RefineEntityName(name)).ToList();
 
@@ -50,13 +52,15 @@ namespace EntityParser
             }
             else
             {
-                this.PropertiesFromSample = new List<MSAEntityDescribe>();
                 foreach (var column in propertyNamesFromSample)
                 {
-                    var property = this.PropertiesFromDescribeFile.Find(item => item.Name.Equals(column));
+                    var property = this.SFDescribes.Fields.Find(item => item.Name.Equals(column));
                     if (property != null)
                     {
-                        this.PropertiesFromSample.Add(new MSAEntityDescribe(property));
+                        // TODO: compounded field like Address cannot be represented now.
+                        if (!property.IsCompounded) {
+                            this.AdsDescribe.Fields.Add(new MSAEntityFieldDescribe(property));
+                        }
                     }
                     else
                     {
@@ -67,10 +71,10 @@ namespace EntityParser
                     }
                 }
 
-                this.ValidateFields(this.PropertiesFromSample);
+                this.ValidateFields(this.AdsDescribe.Fields);
             }
 
-            var unKnownProperties = this.PropertiesFromSample.FindAll(property => property.Type == "unknown").ToList();
+            var unKnownProperties = this.AdsDescribe.Fields.FindAll(property => property.Type == "unknown").ToList();
             if (unKnownProperties.Count > 0)
             {
                 throw new Exception($"Unknown data fields: {string.Join(",", unKnownProperties.Select(field => field.Type).ToList())}");
@@ -85,13 +89,22 @@ namespace EntityParser
             return true;
         }
 
-        private List<SFEntityDescribe> GetAllPropertiesFromItsDescribeFile()
+        private void GetAllPropertiesFromItsDescribeFile()
         {
             string content = File.ReadAllText(this.describeFilePath);
             var dynamicObject = JsonConvert.DeserializeObject<JObject>(content);
             JArray fields = dynamicObject.Value<JArray>("fields");
-            return fields.Select(field =>
-                new SFEntityDescribe((string)(field["name"]), (string)(field["soapType"]), (bool)(field["nillable"]))).ToList();
+            foreach (var field in fields)
+            {
+                string compoundFieldName = (string)(field["compoundFieldName"]);
+                if (!string.IsNullOrEmpty(compoundFieldName) && !this.SFDescribes.CompoundFieldNames.Contains(compoundFieldName))
+                {
+                    this.SFDescribes.CompoundFieldNames.Add((string)(field["compoundFieldName"]));
+                }
+
+                this.SFDescribes.Fields.Add(new SFEntityFieldDescribe((string)(field["name"]), (string)(field["soapType"]), (bool)(field["nillable"])));
+            }
+
         }
 
         private List<string> GetAllPropertyNamesFromSample()
@@ -117,9 +130,9 @@ namespace Microsoft.Advertising.XandrSFDataService.SFEntity
     }
 }";
             string fileContent = sfEntityClassStart;
-            foreach (var field in this.PropertiesFromSample)
+            foreach (var field in this.AdsDescribe.Fields)
             {
-                fileContent = string.Concat(fileContent, $"\r\n        [JsonProperty(\"{field.Name}\", NullValueHandling = NullValueHandling.Ignore)]\r\n        public {field.Type} {field.Name} {{ get; set; }}\r\n");
+                fileContent = string.Concat(fileContent, $"\r\n        [JsonProperty(\"{field.SFName}\", NullValueHandling = NullValueHandling.Ignore)]\r\n        public {field.Type} {field.Name} {{ get; set; }}\r\n");
             }
 
             fileContent = string.Concat(fileContent, sfEntityClassEnd);
@@ -140,7 +153,7 @@ namespace Microsoft.Advertising.XandrSFDataService.AdsEntity
     }
 }";
             string fileContent = adsEntityClassStart;
-            foreach (var field in this.PropertiesFromSample)
+            foreach (var field in this.AdsDescribe.Fields)
             {
                 string typeWithNullableMarker = Utility.AddNullableMarker(field.Type, field.IsNullable);
                 fileContent = string.Concat(fileContent, $"\r\n        public {typeWithNullableMarker} {field.Name} {{ get; set; }}\r\n");
@@ -152,7 +165,7 @@ namespace Microsoft.Advertising.XandrSFDataService.AdsEntity
 
         private void GenerateQueryBuilder()
         {
-            string defaultQuery = string.Concat("SELECT +", string.Join(",", this.PropertiesFromSample.Select(field => field.Name).ToList()), $"+FROM+{this.entityName}");
+            string defaultQuery = string.Concat("SELECT +", string.Join(",", this.AdsDescribe.Fields.Select(field => field.SFName).ToList()), $"+FROM+{this.entityName}");
             string builderClassStart = @"
 using Microsoft.Advertising.XandrSFDataService.Interface;
 using System;
@@ -180,9 +193,9 @@ namespace Microsoft.Advertising.XandrSFDataService.QueryBuilder
             return $""CREATE TABLE [{this.TableName}]"" + @""(";
 
             string tableColumns = "";
-            int maxColumnLength = this.PropertiesFromSample.Select(field => field.Name.Length).Max();
+            int maxColumnLength = this.AdsDescribe.Fields.Select(field => field.Name.Length).Max();
             int formattedColumnLength = maxColumnLength + 4;
-            foreach (var field in this.PropertiesFromSample)
+            foreach (var field in this.AdsDescribe.Fields)
             {
                 tableColumns = string.Concat(tableColumns, $"\r\n    {field.Name}{new string(' ', formattedColumnLength - field.Name.Length)}{Utility.GetSQLType(field.Type)} NULL,");
             }
@@ -221,7 +234,7 @@ namespace Microsoft.Advertising.XandrSFDataService.QueryBuilder
                         .ForCollection(items)
                         .WithTable(TableName)";
             string columns = "";
-            foreach (var field in this.PropertiesFromSample)
+            foreach (var field in this.AdsDescribe.Fields)
             {
                 columns = string.Concat(columns, $"\r\n                        .AddColumn(x => x.{field.Name}, \"{field.Name}\")");
             }
@@ -253,7 +266,7 @@ namespace Microsoft.Advertising.XandrSFDataService.Converter
     }
 }";
             string fileContent = adsEntityConverterClassStart;
-            foreach (var field in this.PropertiesFromSample)
+            foreach (var field in this.AdsDescribe.Fields)
             {
                 fileContent = string.Concat(fileContent, $"\r\n                {field.Name} = aSFEntity.{field.Name},");
             }
@@ -263,7 +276,7 @@ namespace Microsoft.Advertising.XandrSFDataService.Converter
             File.WriteAllText(Path.Combine(this.outputFolderPath, $"{this.entityName}Converter.cs"), fileContent);
         }
 
-        private void ValidateFields(IEnumerable<EntityDescribe> fields)
+        private void ValidateFields(IEnumerable<EntityFieldDescribe> fields)
         {
             var names = fields.Select(f => f.Name).ToList();
             if (names.Count != names.Distinct().Count())

@@ -43,6 +43,17 @@ namespace EntityParser
             return name;
         }
 
+        public static bool IsCompoundType(string soapType)
+        {
+            switch(soapType)
+            {
+                case "urn:address":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
         public static string SoapTypeToCSharpTypeMap(string type)
         {
             switch (type)
@@ -59,6 +70,9 @@ namespace EntityParser
                     return "string";
                 case "xsd:double":
                     return "double";
+                case "xsd:int":
+                    return "int";
+                case "urn:address":
                 default:
                     return "unknown";
             }
@@ -89,6 +103,7 @@ namespace EntityParser
                     return "INT";
                 case "double":
                     return "DECIMAL(18,2)";
+
                 default:
                     return "unknown";
 
