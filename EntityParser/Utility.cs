@@ -4,8 +4,14 @@ namespace EntityParser
 {
     internal class Utility
     {
+        public static bool TurnOffRefineEntityName = false;
         public static string RefineEntityName(string name)
         {
+            if (TurnOffRefineEntityName)
+            {
+                return name;
+            }
+
             List<string> removePatterns = new List<string>()
             {
                 "_1__c",
