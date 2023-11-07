@@ -96,7 +96,7 @@ namespace Microsoft.Advertising.XandrSFDataService.SFEntity
             string fileContent = sfEntityClassStart;
             foreach (var field in this.FieldsFromSample)
             {
-                fileContent = string.Concat(fileContent, $"\r        [JsonProperty(\"{field.Name}\", NullValueHandling = NullValueHandling.Ignore)]\r        public {field.CSharpType} {field.RefineName} {{ get; set; }}\r");
+                fileContent = string.Concat(fileContent, $"\r\n        [JsonProperty(\"{field.Name}\", NullValueHandling = NullValueHandling.Ignore)]\r\n        public {field.CSharpType} {field.RefineName} {{ get; set; }}\r\n");
             }
 
             fileContent = string.Concat(fileContent, sfEntityClassEnd);
@@ -120,7 +120,7 @@ namespace Microsoft.Advertising.XandrSFDataService.AdsEntity
             foreach (var field in this.FieldsFromSample)
             {
                 string typeWithNullableMarker = Utility.AddNullableMarker(field.CSharpType, field.IsNullable);
-                fileContent = string.Concat(fileContent, $"\r        public {typeWithNullableMarker} {field.RefineName} {{ get; set; }}\r");
+                fileContent = string.Concat(fileContent, $"\r\n        public {typeWithNullableMarker} {field.RefineName} {{ get; set; }}\r\n");
             }
 
             fileContent = string.Concat(fileContent, adsEntityClassEnd);
@@ -136,12 +136,12 @@ using System;
 
 namespace Microsoft.Advertising.XandrSFDataService.QueryBuilder
 {
-" + $"internal class {this.entityName}QueryBuilder : SFEntityQueryBuilderBase, ISFEntityQueryBuilder, IAdsEntityQueryBuilder\r" + @"
+" + $"internal class {this.entityName}QueryBuilder : SFEntityQueryBuilderBase, ISFEntityQueryBuilder, IAdsEntityQueryBuilder\r\n" + @"
 {
 " +
-        $"private readonly string EntityNameC = \"{this.entityName}\";\r" +
-        $"private readonly string TableNameC = \"{this.entityName}\";\r" +
-        $"private readonly string DefaultQuery = @\"{defaultQuery}\";\r" +
+        $"private readonly string EntityNameC = \"{this.entityName}\";\r\n" +
+        $"private readonly string TableNameC = \"{this.entityName}\";\r\n" +
+        $"private readonly string DefaultQuery = @\"{defaultQuery}\";\r\n" +
 
         @"
         public string EntityName { get { return this.EntityNameC; } }
@@ -166,7 +166,7 @@ namespace Microsoft.Advertising.XandrSFDataService.QueryBuilder
             int formattedColumnLength = maxColumnLength + 4;
             foreach (var field in this.FieldsFromSample)
             {
-               columns = string.Concat(columns, $"\r    {field.RefineName}{new string(' ', formattedColumnLength - field.RefineName.Length)}{Utility.GetSQLType(field.CSharpType)} NULL,");
+               columns = string.Concat(columns, $"\r\n    {field.RefineName}{new string(' ', formattedColumnLength - field.RefineName.Length)}{Utility.GetSQLType(field.CSharpType)} NULL,");
             }
             string builderClassEnd = @"
 );"";
@@ -205,7 +205,7 @@ namespace Microsoft.Advertising.XandrSFDataService.QueryBuilder
             string columns = "";
             foreach (var field in this.FieldsFromSample)
             {
-                columns = string.Concat(columns, $"\r                        .AddColumn(x => x.{field.RefineName}, \"{field.RefineName}\")");
+                columns = string.Concat(columns, $"\r\n                        .AddColumn(x => x.{field.RefineName}, \"{field.RefineName}\")");
             }
             string builderClassEnd = @"
                         .BulkInsertOrUpdate()
@@ -237,7 +237,7 @@ namespace Microsoft.Advertising.XandrSFDataService.Converter
             string fileContent = adsEntityConverterClassStart;
             foreach (var field in this.FieldsFromSample)
             {
-                fileContent = string.Concat(fileContent, $"\r{field.RefineName} = aSFEntity.{field.RefineName},");
+                fileContent = string.Concat(fileContent, $"\r\n                {field.RefineName} = aSFEntity.{field.RefineName},");
             }
 
             fileContent = string.Concat(fileContent, adsEntityConverterClassEnd);
