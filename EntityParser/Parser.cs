@@ -85,6 +85,7 @@ namespace EntityParser
             this.GenerateQueryBuilder();
             this.GenerateConverter();
             this.GenerateAdsDataService();
+            this.GenerateProcessor();
 
             return true;
         }
@@ -274,6 +275,37 @@ namespace Microsoft.Advertising.XandrSFDataService.Converter
             fileContent = string.Concat(fileContent, adsEntityConverterClassEnd);
 
             File.WriteAllText(Path.Combine(this.outputFolderPath, $"{this.entityName}Converter.cs"), fileContent);
+        }
+
+        private void GenerateProcessor()
+        {
+            string fileContent = $"\r\n" + 
+$"using SFAccount = Microsoft.Advertising.XandrSFDataService.SFEntity.{this.entityName};\r\n" +
+$"using AdsAccount = Microsoft.Advertising.XandrSFDataService.AdsEntity.{ this.entityName};\r\n" +
+@"using Microsoft.Advertising.XandrSFDataService.Interface;
+using System;
+using Microsoft.Advertising.XandrSFDataService.Converter;
+
+namespace Microsoft.Advertising.XandrSFDataService.SyncProcessor
+{
+" +
+$"    internal class {this.entityName}SyncProcessor : BaseEntityProcessor<SF{this.entityName}, Ads{this.entityName}>\r\n" +
+@"    {" +
+$"        public {this.entityName}SyncProcessor(ISFDataService<SF{this.entityName}> sfService, IAdsDataService<Ads{this.entityName}> adsService) : base(sfService, adsService)" + @"
+        {
+        }
+" + $"\r\npublic override Func<SF{this.entityName}, Ads{this.entityName}> Converter" + @"
+        {
+            get
+            {
+" + 
+$"                return {this.entityName}Converter.Converter;" + @"
+            }
+        }
+    }
+}
+";
+            File.WriteAllText(Path.Combine(this.outputFolderPath, $"{this.entityName}SyncProcessor.cs"), fileContent);
         }
 
         private void ValidateFields(IEnumerable<EntityFieldDescribe> fields)
