@@ -233,15 +233,15 @@ namespace Microsoft.Advertising.XandrSFDataService.QueryBuilder
         return new BulkOperations()
 " + $"                       .Setup<{this.entityName}>()" + @"
                         .ForCollection(items)
-                        .WithTable(TableName)";
+                        .WithTable(TableName)
+                        .AddAllColumns()";
             string columns = "";
             foreach (var field in this.AdsDescribe.Fields)
             {
-                columns = string.Concat(columns, $"\r\n                        .AddColumn(x => x.{field.Name}, \"{field.Name}\")");
+                columns = string.Concat(columns, $"\r\n                        .CustomColumnMapping(x => x.{field.Name}, \"{field.Name}\")");
             }
             string builderClassEnd = @"
                         .BulkInsertOrUpdate()
-                        .SetIdentityColumn(x => x.Id)
                         .MatchTargetOn(x => x.Id);
         }
     }
