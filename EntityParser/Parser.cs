@@ -133,7 +133,8 @@ namespace Microsoft.Advertising.XandrSFDataService.SFEntity
             string fileContent = sfEntityClassStart;
             foreach (var field in this.AdsDescribe.Fields)
             {
-                fileContent = string.Concat(fileContent, $"\r\n        [JsonProperty(\"{field.SFName}\", NullValueHandling = NullValueHandling.Ignore)]\r\n        public {field.Type} {field.Name} {{ get; set; }}\r\n");
+                string typeWithNullableMarker = Utility.AddNullableMarker(field.Type, field.IsNullable);
+                fileContent = string.Concat(fileContent, $"\r\n        [JsonProperty(\"{field.SFName}\", NullValueHandling = NullValueHandling.Ignore)]\r\n        public {typeWithNullableMarker} {field.Name} {{ get; set; }}\r\n");
             }
 
             fileContent = string.Concat(fileContent, sfEntityClassEnd);
@@ -213,6 +214,7 @@ namespace Microsoft.Advertising.XandrSFDataService.QueryBuilder
         {
             string builderClassStart = @"
 using Microsoft.Advertising.XandrSFDataService.AdsEntity;
+using Microsoft.Advertising.XandrSFDataService.AdsService;
 using Microsoft.Advertising.XandrSFDataService.Interface;
 using SqlBulkTools;
 using System.Collections.Generic;
@@ -280,8 +282,8 @@ namespace Microsoft.Advertising.XandrSFDataService.Converter
         private void GenerateProcessor()
         {
             string fileContent = $"\r\n" + 
-$"using SFAccount = Microsoft.Advertising.XandrSFDataService.SFEntity.{this.entityName};\r\n" +
-$"using AdsAccount = Microsoft.Advertising.XandrSFDataService.AdsEntity.{ this.entityName};\r\n" +
+$"using SF{this.entityName} = Microsoft.Advertising.XandrSFDataService.SFEntity.{this.entityName};\r\n" +
+$"using Ads{this.entityName} = Microsoft.Advertising.XandrSFDataService.AdsEntity.{ this.entityName};\r\n" +
 @"using Microsoft.Advertising.XandrSFDataService.Interface;
 using System;
 using Microsoft.Advertising.XandrSFDataService.Converter;

@@ -12,16 +12,16 @@ namespace EntityParser
                 return name;
             }
 
-            List<string> removePatterns = new List<string>()
+            Dictionary<string, string> removePatterns = new Dictionary<string, string>()
             {
-                "_1__c",
-                "_s__c",
-                "__c",
+                { "_1__c", "C" },
+                { "_s__c", "C" },
+                { "__c", "C" }
             };
 
             foreach (var pattern in removePatterns)
             {
-                name = name.Replace(pattern, string.Empty);
+                name = name.Replace(pattern.Key, pattern.Value);
             }
 
             // change What_can_we_help_with to WhatCanWeHelpWith
