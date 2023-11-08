@@ -150,6 +150,7 @@ namespace Microsoft.Advertising.XandrSFDataService.AdsEntity
 {
     [Serializable]
     " + $"internal class {this.entityName}" + @"{
+        public string URL { get; set; }
 ";
             string adsEntityClassEnd = @"
     }
@@ -193,10 +194,9 @@ namespace Microsoft.Advertising.XandrSFDataService.QueryBuilder
         public string BuildTableCreationQuery()
         {
             return $""CREATE TABLE [{this.TableName}]"" + @""(";
-
-            string tableColumns = "";
             int maxColumnLength = this.AdsDescribe.Fields.Select(field => field.Name.Length).Max();
             int formattedColumnLength = maxColumnLength + 4;
+            string tableColumns = $"\r\n    URL{new string(' ', formattedColumnLength - "URL".Length)}{Utility.GetSQLType("string")} NULL,";
             foreach (var field in this.AdsDescribe.Fields)
             {
                 tableColumns = string.Concat(tableColumns, $"\r\n    {field.Name}{new string(' ', formattedColumnLength - field.Name.Length)}{Utility.GetSQLType(field.Type)} NULL,");
@@ -236,7 +236,8 @@ namespace Microsoft.Advertising.XandrSFDataService.QueryBuilder
 " + $"                       .Setup<{this.entityName}>()" + @"
                         .ForCollection(items)
                         .WithTable(TableName)
-                        .AddAllColumns()";
+                        .AddAllColumns()
+                        .CustomColumnMapping(x => x.URL, ""URL"")";
             string columns = "";
             foreach (var field in this.AdsDescribe.Fields)
             {
@@ -262,7 +263,8 @@ namespace Microsoft.Advertising.XandrSFDataService.Converter
         " + $"public static  AdsEntity.{this.entityName} Converter(SFEntity.{this.entityName} aSFEntity)" + @"
         {
 " + $"            return new AdsEntity.{this.entityName}()" + @"
-{";
+{
+                URL = aSFEntity.Attributes.Url,";
             string adsEntityConverterClassEnd = @"
             };
         }

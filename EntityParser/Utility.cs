@@ -94,16 +94,15 @@ namespace EntityParser
             switch (csharpType)
             {
                 case "string":
-                    return "NVARCHAR(200)";
+                    return "NVARCHAR(MAX)";
                 case "DateTime":
-                    return "NVARCHAR(200)";
+                    return "NVARCHAR(MAX)";
                 case "bool":
-                    return "BIT";
+                    return "NVARCHAR(MAX)";
                 case "int":
                     return "INT";
                 case "double":
                     return "DECIMAL(18,2)";
-
                 default:
                     return "unknown";
 
