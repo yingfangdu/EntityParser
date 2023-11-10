@@ -48,7 +48,7 @@ namespace EntityParser
                     .GroupBy(i => i)
                     .Where(g => g.Count() > 1)
                     .Select(g => g.Key);
-                throw new Exception($"There are duplicated property names :{string.Join("","", duplicates)}");
+                throw new Exception($"There are duplicated property names :{string.Join("", "", duplicates)}");
             }
             else
             {
@@ -58,7 +58,8 @@ namespace EntityParser
                     if (property != null)
                     {
                         // TODO: compounded field like Address cannot be represented now.
-                        if (!property.IsCompounded) {
+                        if (!property.IsCompounded)
+                        {
                             this.AdsDescribe.Fields.Add(new MSAEntityFieldDescribe(property));
                         }
                     }
@@ -288,9 +289,9 @@ namespace Microsoft.Advertising.XandrSFDataService.Converter
 
         private void GenerateProcessor()
         {
-            string fileContent = $"\r\n" + 
+            string fileContent = $"\r\n" +
 $"using SF{this.entityName} = Microsoft.Advertising.XandrSFDataService.SFEntity.{this.entityName};\r\n" +
-$"using Ads{this.entityName} = Microsoft.Advertising.XandrSFDataService.AdsEntity.{ this.entityName};\r\n" +
+$"using Ads{this.entityName} = Microsoft.Advertising.XandrSFDataService.AdsEntity.{this.entityName};\r\n" +
 @"using Microsoft.Advertising.XandrSFDataService.Interface;
 using System;
 using Microsoft.Advertising.XandrSFDataService.Converter;
@@ -307,7 +308,7 @@ $"        public {this.entityName}SyncProcessor(ISyncHistoryService syncHistoryS
         {
             get
             {
-" + 
+" +
 $"                return {this.entityName}Converter.Converter;" + @"
             }
         }
