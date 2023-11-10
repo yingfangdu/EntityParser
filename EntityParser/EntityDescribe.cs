@@ -9,17 +9,21 @@ namespace EntityParser
 
     public class SFEntityFieldDescribe  : EntityFieldDescribe
     {
-        public SFEntityFieldDescribe(string name, string type, bool isNullable)
+        public SFEntityFieldDescribe(string name, string type, bool isNullable, int precision, int scale)
         {
             this.Name = name;
             this.Type = type;
             this.IsNullable = isNullable;
+            this.Precision = precision;
+            this.Scale = scale;
         }
 
         public string Name { get; private set; }
         public string Type { get; private set; }
         public bool IsNullable { get; private set; }
         public bool IsCompounded { get { return Utility.IsCompoundType(this.Type); } }
+        public int Precision { get; private set; }
+        public int Scale { get; private set; }
     }
 
     public class MSAEntityFieldDescribe  : EntityFieldDescribe
@@ -30,6 +34,7 @@ namespace EntityParser
             this.Name = Utility.RefineEntityName(sfEntityDescribe.Name);
             this.Type = Utility.SoapTypeToCSharpTypeMap(sfEntityDescribe.Type);
             this.IsNullable = sfEntityDescribe.IsNullable;
+            this.SQLType = Utility.GetSQLType(this.Type, sfEntityDescribe.Precision, sfEntityDescribe.Scale);
         }
 
         public string SFName { get; private set; }
@@ -37,6 +42,8 @@ namespace EntityParser
         public string Name { get; private set; }
         public string Type { get; private set; }
         public bool IsNullable { get; private set; }
+
+        public string SQLType { get; private set; }
     }
 
     internal class SFEntityDescribe

@@ -103,7 +103,7 @@ namespace EntityParser
                     this.SFDescribes.CompoundFieldNames.Add((string)(field["compoundFieldName"]));
                 }
 
-                this.SFDescribes.Fields.Add(new SFEntityFieldDescribe((string)(field["name"]), (string)(field["soapType"]), (bool)(field["nillable"])));
+                this.SFDescribes.Fields.Add(new SFEntityFieldDescribe((string)(field["name"]), (string)(field["soapType"]), (bool)(field["nillable"]), int.Parse((string)(field["precision"])), int.Parse((string)(field["scale"]))));
             }
 
         }
@@ -204,7 +204,7 @@ namespace Microsoft.Advertising.XandrSFDataService.QueryBuilder
             string tableColumns = $"\r\n    URL{new string(' ', formattedColumnLength - "URL".Length)}{Utility.GetSQLType("string")} NULL,";
             foreach (var field in this.AdsDescribe.Fields)
             {
-                tableColumns = string.Concat(tableColumns, $"\r\n    {field.Name}{new string(' ', formattedColumnLength - field.Name.Length)}{Utility.GetSQLType(field.Type)} NULL,");
+                tableColumns = string.Concat(tableColumns, $"\r\n    {field.Name}{new string(' ', formattedColumnLength - field.Name.Length)}{field.SQLType} NULL,");
             }
             string builderClassEnd = @"
 );"";

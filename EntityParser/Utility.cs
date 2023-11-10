@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace EntityParser
 {
@@ -89,8 +90,13 @@ namespace EntityParser
             return isNullable ? $"{csharpType}?" : csharpType;
         }
 
-        public static string GetSQLType(string csharpType)
+        public static string GetSQLType(string csharpType, int precision = 0, int scale = 0)
         {
+            if (csharpType != "double" && precision != 0 && scale != 0)
+            {
+                throw new NotSupportedException("precision and scale are only for double");
+            }
+
             switch (csharpType)
             {
                 case "string":
@@ -98,14 +104,13 @@ namespace EntityParser
                 case "DateTime":
                     return "NVARCHAR(MAX)";
                 case "bool":
-                    return "NVARCHAR(MAX)";
+                    return "NVARCHAR(100)";
                 case "int":
                     return "INT";
                 case "double":
-                    return "DECIMAL(18,2)";
+                    return $"DECIMAL({precision}, {scale})";
                 default:
                     return "unknown";
-
             }
         }
     }
