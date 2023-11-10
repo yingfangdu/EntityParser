@@ -59,9 +59,9 @@ namespace EntityParser
             switch (type)
             {
                 case "xsd:dateTime":
-                    return "DateTime";
+                    return "string";
                 case "xsd:date":
-                    return "DateTime";
+                    return "string";
                 case "tns:ID":
                     return "string";
                 case "xsd:boolean":
@@ -83,7 +83,7 @@ namespace EntityParser
             // TODO enable string nullable type.
             if (csharpType == "string")
             {
-                return csharpType;
+                return "string";
             }
 
             return isNullable ? $"{csharpType}?" : csharpType;

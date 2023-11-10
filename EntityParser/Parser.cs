@@ -186,9 +186,14 @@ namespace Microsoft.Advertising.XandrSFDataService.QueryBuilder
         public string EntityName { get { return this.EntityNameC; } }
         public string TableName { get { return this.TableNameC; } }
 
-        public string BuildEntityReadQuery(DateTime? lastUpdateTimeStamp)
+        public string BuildEntityReadDefaultQuery()
         {
             return string.Concat(GetBaseQueryUrl(), DefaultQuery);
+        }
+
+        public string BuildEntityReadDeltaQuery(DateTime lastUpdateTimeStamp)
+        {
+            throw new NotImplementedException();
         }
 
         public string BuildTableCreationQuery()
@@ -235,7 +240,7 @@ namespace Microsoft.Advertising.XandrSFDataService.QueryBuilder
         return new BulkOperations()
 " + $"                       .Setup<{this.entityName}>()" + @"
                         .ForCollection(items)
-                        .WithTable(TableName)
+                        .WithTable(this.TableName)
                         .AddAllColumns()
                         .CustomColumnMapping(x => x.URL, ""URL"")";
             string columns = "";
@@ -295,7 +300,7 @@ namespace Microsoft.Advertising.XandrSFDataService.SyncProcessor
 " +
 $"    internal class {this.entityName}SyncProcessor : BaseEntityProcessor<SF{this.entityName}, Ads{this.entityName}>\r\n" +
 @"    {" +
-$"        public {this.entityName}SyncProcessor(ISFDataService<SF{this.entityName}> sfService, IAdsDataService<Ads{this.entityName}> adsService) : base(sfService, adsService)" + @"
+$"        public {this.entityName}SyncProcessor(ISyncHistoryService syncHistoryService, ISFDataService<SF{this.entityName}> sfService, IAdsDataService<Ads{this.entityName}> adsService) : base(syncHistoryService, sfService, adsService)" + @"
         {
         }
 " + $"\r\npublic override Func<SF{this.entityName}, Ads{this.entityName}> Converter" + @"
