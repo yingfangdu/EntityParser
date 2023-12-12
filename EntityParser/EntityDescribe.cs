@@ -1,13 +1,12 @@
-﻿using System.Collections.Generic;
-
-namespace EntityParser
+﻿namespace EntityParser
 {
+    using System.Collections.Generic;
     internal interface EntityFieldDescribe
     {
         string Name { get; }
     }
 
-    public class SFEntityFieldDescribe  : EntityFieldDescribe
+    public class SFEntityFieldDescribe : EntityFieldDescribe
     {
         public SFEntityFieldDescribe(string name, string type, bool isNullable, int precision, int scale)
         {
@@ -26,24 +25,24 @@ namespace EntityParser
         public int Scale { get; private set; }
     }
 
-    public class MSAEntityFieldDescribe  : EntityFieldDescribe
+    public class MSAEntityFieldDescribe : EntityFieldDescribe
     {
         public MSAEntityFieldDescribe(SFEntityFieldDescribe sfEntityDescribe)
         {
             this.SFName = sfEntityDescribe.Name;
             this.Name = Utility.RefineEntityName(sfEntityDescribe.Name);
+            this.NameFirstCharaterInLowerCase = this.Name.Substring(0, 1).ToLower() + this.Name.Substring(1);
             this.Type = Utility.SoapTypeToCSharpTypeMap(sfEntityDescribe.Type);
             this.IsNullable = sfEntityDescribe.IsNullable;
-            this.SQLType = Utility.GetSQLType(this.Type, sfEntityDescribe.Precision, sfEntityDescribe.Scale);
+            this.TypeWithNullable = Utility.AddNullableMarker(this.Type, this.IsNullable);
         }
 
         public string SFName { get; private set; }
-
         public string Name { get; private set; }
+        public string NameFirstCharaterInLowerCase { get; private set; }
         public string Type { get; private set; }
+        public string TypeWithNullable { get; private set; }
         public bool IsNullable { get; private set; }
-
-        public string SQLType { get; private set; }
     }
 
     internal class SFEntityDescribe

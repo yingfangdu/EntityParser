@@ -1,12 +1,12 @@
-﻿using Newtonsoft.Json.Linq;
-using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.IO;
-
-namespace EntityParser
+﻿namespace EntityParser
 {
+    using Newtonsoft.Json.Linq;
+    using Newtonsoft.Json;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
+    using System.IO;
+    using System.Text;
     internal class Parser
     {
         private readonly string describeFilePath;
@@ -82,11 +82,8 @@ namespace EntityParser
             }
 
             this.GenerateFSEntityFile();
-            this.GenerateAdsEntityFile();
             this.GenerateQueryBuilder();
-            this.GenerateConverter();
-            this.GenerateAdsDataService();
-            this.GenerateProcessor();
+            this.GenerateParquetWriter();
 
             return true;
         }
@@ -106,7 +103,6 @@ namespace EntityParser
 
                 this.SFDescribes.Fields.Add(new SFEntityFieldDescribe((string)(field["name"]), (string)(field["soapType"]), (bool)(field["nillable"]), int.Parse((string)(field["precision"])), int.Parse((string)(field["scale"]))));
             }
-
         }
 
         private List<string> GetAllPropertyNamesFromSample()
@@ -118,74 +114,52 @@ namespace EntityParser
 
         private void GenerateFSEntityFile()
         {
-            string sfEntityClassStart = @"
-using Newtonsoft.Json;
-
-namespace Microsoft.Advertising.XandrSFDataService.SFEntity
+            StringBuilder fileContent = new StringBuilder();
+            fileContent.Append(@"namespace Xandr.Salesforce.Data.Pull.SFEntity
 {
-" +
-        $"    internal class {this.entityName}" + @"{
+    using Newtonsoft.Json;
+
+");
+            fileContent.AppendLine($"    internal class {this.entityName}");
+            fileContent.AppendLine(@"    {
         [JsonProperty(""attributes"", NullValueHandling = NullValueHandling.Ignore)]
-        public Attributes Attributes { get; set; }
-";
-            string sfEntityClassEnd = @"
-    }
-}";
-            string fileContent = sfEntityClassStart;
+        public required Attributes Attributes { get; set; }
+");
             foreach (var field in this.AdsDescribe.Fields)
             {
-                string typeWithNullableMarker = Utility.AddNullableMarker(field.Type, field.IsNullable);
-                fileContent = string.Concat(fileContent, $"\r\n        [JsonProperty(\"{field.SFName}\", NullValueHandling = NullValueHandling.Ignore)]\r\n        public {typeWithNullableMarker} {field.Name} {{ get; set; }}\r\n");
+                fileContent.AppendLine($"        [JsonProperty(\"{field.SFName}\", NullValueHandling = NullValueHandling.Ignore)]");
+                fileContent.AppendLine($"        public {field.TypeWithNullable} {field.Name} {{ get; set; }}");
+                fileContent.Append("\r\n");
             }
 
-            fileContent = string.Concat(fileContent, sfEntityClassEnd);
-            File.WriteAllText(Path.Combine(this.outputFolderPath, $"SF{this.entityName}.cs"), fileContent);
-        }
-
-        private void GenerateAdsEntityFile()
-        {
-            string adsEntityClassStart = @"
-using System;
-
-namespace Microsoft.Advertising.XandrSFDataService.AdsEntity
-{
-    [Serializable]
-    " + $"internal class {this.entityName}" + @"{
-        public string URL { get; set; }
-";
-            string adsEntityClassEnd = @"
-    }
-}";
-            string fileContent = adsEntityClassStart;
-            foreach (var field in this.AdsDescribe.Fields)
-            {
-                string typeWithNullableMarker = Utility.AddNullableMarker(field.Type, field.IsNullable);
-                fileContent = string.Concat(fileContent, $"\r\n        public {typeWithNullableMarker} {field.Name} {{ get; set; }}\r\n");
-            }
-
-            fileContent = string.Concat(fileContent, adsEntityClassEnd);
-            File.WriteAllText(Path.Combine(this.outputFolderPath, $"Ad{this.entityName}.cs"), fileContent);
+            fileContent.Append(@"}
+}");
+            File.WriteAllText(Path.Combine(this.outputFolderPath, $"{this.entityName}.cs"), fileContent.ToString());
         }
 
         private void GenerateQueryBuilder()
         {
             string defaultQuery = string.Concat("SELECT +", string.Join(",", this.AdsDescribe.Fields.Select(field => field.SFName).ToList()), $"+FROM+{this.entityName}");
-            string builderClassStart = @"
-using Microsoft.Advertising.XandrSFDataService.Interface;
-using System;
-
-namespace Microsoft.Advertising.XandrSFDataService.QueryBuilder
+            StringBuilder fileContent = new StringBuilder();
+            fileContent.Append(@"namespace Xandr.Salesforce.Data.Pull.QueryBuilder
 {
-" + $"internal class {this.entityName}QueryBuilder : SFEntityQueryBuilderBase, ISFEntityQueryBuilder, IAdsEntityQueryBuilder\r\n" + @"
-{
+    using Xandr.Salesforce.Data.Pull.Interface;
+    using Xandr.Salesforce.Data.Pull.Utils;
+");
+            fileContent.AppendLine(
+$"    internal class {this.entityName}QueryBuilder : SFEntityQueryBuilderBase, ISFEntityQueryBuilder");
+            fileContent.AppendLine(
+@"    {
 " +
-        $"private readonly string EntityNameC = \"{this.entityName}\";\r\n" +
-        $"private readonly string TableNameC = \"{this.entityName}\";\r\n" +
-        $"private readonly string DefaultQuery = @\"{defaultQuery}\";\r\n" +
+        $"        private readonly string EntityNameC = \"{this.entityName}\";\r\n" +
+        $"        private readonly string DefaultQuery = @\"{defaultQuery}\";\r\n" +
+        @"        private readonly string DeltaWhereClause = ""+WHERE+LastModifiedDate>="";
 
-        @"
+" +
+$"        public {this.entityName}QueryBuilder(XandrSalesforceConfig config) : base(config) {{ }}" +
+@"
+
         public string EntityName { get { return this.EntityNameC; } }
-        public string TableName { get { return this.TableNameC; } }
 
         public string BuildEntityReadDefaultQuery()
         {
@@ -194,128 +168,122 @@ namespace Microsoft.Advertising.XandrSFDataService.QueryBuilder
 
         public string BuildEntityReadDeltaQuery(DateTime lastUpdateTimeStamp)
         {
-            throw new NotImplementedException();
-        }
-
-        public string BuildTableCreationQuery()
-        {
-            return $""CREATE TABLE [{this.TableName}]"" + @""(";
-            int maxColumnLength = this.AdsDescribe.Fields.Select(field => field.Name.Length).Max();
-            int formattedColumnLength = maxColumnLength + 4;
-            string tableColumns = $"\r\n    URL{new string(' ', formattedColumnLength - "URL".Length)}{Utility.GetSQLType("string")} NULL,";
-            foreach (var field in this.AdsDescribe.Fields)
-            {
-                tableColumns = string.Concat(tableColumns, $"\r\n    {field.Name}{new string(' ', formattedColumnLength - field.Name.Length)}{field.SQLType} NULL,");
-            }
-            string builderClassEnd = @"
-);"";
+            string whereClause = this.DeltaWhereClause + lastUpdateTimeStamp.ToUniversalTime().ToString(""o"");
+            return string.Concat(BuildEntityReadDefaultQuery(), whereClause);
         }
     }
-}";
-
-            File.WriteAllText(Path.Combine(this.outputFolderPath, $"{this.entityName}QueryBuilder.cs"), string.Concat(builderClassStart, tableColumns, builderClassEnd));
+}");
+            File.WriteAllText(Path.Combine(this.outputFolderPath, $"{this.entityName}QueryBuilder.cs"), fileContent.ToString());
         }
 
-        private void GenerateAdsDataService()
+        private void GenerateParquetWriter()
         {
-            string builderClassStart = @"
-using Microsoft.Advertising.XandrSFDataService.AdsEntity;
-using Microsoft.Advertising.XandrSFDataService.AdsService;
-using Microsoft.Advertising.XandrSFDataService.Interface;
-using SqlBulkTools;
-using System.Collections.Generic;
+            StringBuilder fileContent = new StringBuilder();
+            fileContent.Append(@"namespace Xandr.Salesforce.Data.Pull.AdsDataService
+{
+    using System.IO;
+    using System.Collections.Generic;
+    using Parquet;
+    using Parquet.Data;
+    using Xandr.Salesforce.Data.Pull.SFEntity;
+    using Parquet.Schema;
+    using System.Threading.Tasks;
+    using System;
+    using Microsoft.Extensions.Logging;
 
-namespace Microsoft.Advertising.XandrSFDataService.QueryBuilder
-{
-" + $"internal class {this.entityName}DataService : AdsDataServiceBase<{this.entityName}>" + @"
-{
-" +
-        $"public {this.entityName}DataService(IAdsEntityQueryBuilder queryBuilder) : base(queryBuilder)" + @"
-{
-}
+");
 
-" +
-        $"protected override BulkInsertOrUpdate<{this.entityName}> BuildBulkEditOperation(List<{this.entityName}> items)" +
-        @"
-{
-        return new BulkOperations()
-" + $"                       .Setup<{this.entityName}>()" + @"
-                        .ForCollection(items)
-                        .WithTable(this.TableName)
-                        .AddAllColumns()
-                        .CustomColumnMapping(x => x.URL, ""URL"")";
-            string columns = "";
+            fileContent.Append($"    internal class {this.entityName}ParquetWriter :BaseParquetWriter<{this.entityName}>\r\n");
+            fileContent.Append(
+@"    {
+");
             foreach (var field in this.AdsDescribe.Fields)
             {
-                columns = string.Concat(columns, $"\r\n                        .CustomColumnMapping(x => x.{field.Name}, \"{field.Name}\")");
+                fileContent.AppendLine($"        private List<{field.TypeWithNullable}>? _{field.NameFirstCharaterInLowerCase};");
             }
-            string builderClassEnd = @"
-                        .BulkInsertOrUpdate()
-                        .MatchTargetOn(x => x.Id);
-        }
-    }
-}";
-            File.WriteAllText(Path.Combine(this.outputFolderPath, $"{this.entityName}DataService.cs"), string.Concat(builderClassStart, columns, builderClassEnd));
-        }
 
-        private void GenerateConverter()
+            fileContent.AppendLine("\n");
+            fileContent.Append($"        public {this.entityName}ParquetWriter(ILogger logger) : base(logger)");
+            fileContent.Append(
+@"
         {
-            string adsEntityConverterClassStart = @"
+        }
+");
+            fileContent.Append(@"
+        protected override bool HasCache
+        {
+            get { return this._id != null && this._id.Count > 0; }
+        }
 
-namespace Microsoft.Advertising.XandrSFDataService.Converter
-{
-    " + $"internal static class {this.entityName}Converter" + @"
+        protected override bool ShouldFlushCache
+        {
+            get { return this._id != null && this._id.Count >= this.RowGroupSize; }
+        }
+
+");
+
+            fileContent.Append($"        protected override Task<bool> WriteItem({this.entityName} item)");
+            fileContent.Append(@"
     {
-        " + $"public static  AdsEntity.{this.entityName} Converter(SFEntity.{this.entityName} aSFEntity)" + @"
-        {
-" + $"            return new AdsEntity.{this.entityName}()" + @"
-{
-                URL = aSFEntity.Attributes.Url,";
-            string adsEntityConverterClassEnd = @"
-            };
-        }
-    }
-}";
-            string fileContent = adsEntityConverterClassStart;
+");
             foreach (var field in this.AdsDescribe.Fields)
             {
-                fileContent = string.Concat(fileContent, $"\r\n                {field.Name} = aSFEntity.{field.Name},");
+                fileContent.AppendLine($"        this._{field.NameFirstCharaterInLowerCase}!.Add(item.{field.Name});");
             }
 
-            fileContent = string.Concat(fileContent, adsEntityConverterClassEnd);
+            fileContent.Append(@"        return Task.FromResult(true);
+    }
+");
 
-            File.WriteAllText(Path.Combine(this.outputFolderPath, $"{this.entityName}Converter.cs"), fileContent);
-        }
-
-        private void GenerateProcessor()
+            fileContent.Append(@"
+        protected override async Task FlushCache()
         {
-            string fileContent = $"\r\n" +
-$"using SF{this.entityName} = Microsoft.Advertising.XandrSFDataService.SFEntity.{this.entityName};\r\n" +
-$"using Ads{this.entityName} = Microsoft.Advertising.XandrSFDataService.AdsEntity.{this.entityName};\r\n" +
-@"using Microsoft.Advertising.XandrSFDataService.Interface;
-using System;
-using Microsoft.Advertising.XandrSFDataService.Converter;
-
-namespace Microsoft.Advertising.XandrSFDataService.SyncProcessor
-{
-" +
-$"    internal class {this.entityName}SyncProcessor : BaseEntityProcessor<SF{this.entityName}, Ads{this.entityName}>\r\n" +
-@"    {" +
-$"        public {this.entityName}SyncProcessor(ISyncHistoryService syncHistoryService, ISFDataService<SF{this.entityName}> sfService, IAdsDataService<Ads{this.entityName}> adsService) : base(syncHistoryService, sfService, adsService)" + @"
-        {
-        }
-" + $"\r\npublic override Func<SF{this.entityName}, Ads{this.entityName}> Converter" + @"
-        {
-            get
+");
+            foreach (var field in this.AdsDescribe.Fields)
             {
-" +
-$"                return {this.entityName}Converter.Converter;" + @"
+                fileContent.AppendLine($"      var {field.NameFirstCharaterInLowerCase}Field= new DataField<{field.TypeWithNullable}>(\"{field.Name}\");");
             }
+            fileContent.Append("\r\n");
+            fileContent.AppendLine("var schema = new ParquetSchema(");
+            foreach (var field in this.AdsDescribe.Fields)
+            {
+                fileContent.AppendLine(field == this.AdsDescribe.Fields.Last() ? $"     {field.NameFirstCharaterInLowerCase}Field);" :
+                    $"      {field.NameFirstCharaterInLowerCase}Field,");
+            }
+
+            fileContent.Append(@"
+            using (var parquetWriter = await ParquetWriter.CreateAsync(schema:schema, output: this.Stream!, formatOptions: null, append: this.AppendFile))
+            {
+                using (ParquetRowGroupWriter groupWriter = parquetWriter.CreateRowGroup())
+                {
+");
+            foreach (var field in this.AdsDescribe.Fields)
+            {
+                fileContent.AppendLine($"      await groupWriter.WriteColumnAsync(new DataColumn({field.NameFirstCharaterInLowerCase}Field, this._{field.NameFirstCharaterInLowerCase}!.ToArray()));");
+            }
+
+            fileContent.Append(@"}
         }
     }
-}
-";
-            File.WriteAllText(Path.Combine(this.outputFolderPath, $"{this.entityName}SyncProcessor.cs"), fileContent);
+");
+
+            fileContent.Append(@"
+         protected override void ResetCache()
+        {
+            this.AppendFile = true; 
+");
+            foreach (var field in this.AdsDescribe.Fields)
+            {
+                fileContent.AppendLine($"      this._{field.NameFirstCharaterInLowerCase} = new List<{field.TypeWithNullable}>(this.RowGroupSize);");
+            }
+
+            fileContent.Append(@"}
+    }
+}");
+
+            File.WriteAllText(
+                Path.Combine(this.outputFolderPath, $"{this.entityName}ParquetWriter.cs"),
+                fileContent.ToString());
         }
 
         private void ValidateFields(IEnumerable<EntityFieldDescribe> fields)

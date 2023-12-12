@@ -84,7 +84,8 @@ namespace EntityParser
             // TODO enable string nullable type.
             if (csharpType == "string")
             {
-                return "string";
+                // the project supports nullable.
+                return "string?";
             }
 
             return isNullable ? $"{csharpType}?" : csharpType;
